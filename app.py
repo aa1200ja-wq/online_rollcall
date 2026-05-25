@@ -238,6 +238,33 @@ def handle_students(class_id):
             conn.close()
             return jsonify({'error': f'該班級已存在座號 {seat_num}'}), 400
 
+@app.route('/api/classes/<int:class_id>/students/batch', methods=['POST'])
+@login_required
+def handle_students_batch(class_id):
+    data = request.json
+    students = data.get('students', [])
+    if not students:
+        return jsonify({'error': '沒有學生資料'}), 400
+    conn = get_db()
+    cursor = conn.cursor()
+    imported = 0
+    errors = []
+    for s in students:
+        seat_num = s.get('seat_num')
+        name = s.get('name', '').strip()
+        if not seat_num or not name:
+            errors.append(f'座號 {seat_num}: 姓名無效')
+            continue
+        try:
+            cursor.execute("INSERT INTO students (class_id, seat_num, name) VALUES (?, ?, ?)",
+                           (class_id, seat_num, name))
+            imported += 1
+        except sqlite3.IntegrityError:
+            errors.append(f'座號 {seat_num}: 已存在')
+    conn.commit()
+    conn.close()
+    return jsonify({'imported': imported, 'errors': errors})
+
 @app.route('/api/students/<int:student_id>', methods=['PUT', 'DELETE'])
 @login_required
 def handle_student_detail(student_id):

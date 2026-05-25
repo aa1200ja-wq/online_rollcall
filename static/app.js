@@ -764,6 +764,70 @@ async function renderAnnualSummary() {
   table.innerHTML = html;
 }
 
+// --- Batch Import ---
+function openBatchImport() {
+  document.getElementById('batch-modal').classList.remove('hidden');
+  document.getElementById('batch-textarea').value = '';
+  document.getElementById('batch-result').classList.add('hidden');
+}
+
+function closeBatchImport() {
+  document.getElementById('batch-modal').classList.add('hidden');
+}
+
+async function submitBatchImport() {
+  const text = document.getElementById('batch-textarea').value.trim();
+  if (!text) return alert('請輸入學生資料');
+
+  const lines = text.split('\n').filter(l => l.trim());
+  const students = [];
+  const parseErrors = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    const parts = line.split(/[,，\t]+/).map(s => s.trim());
+    const seatNum = parseInt(parts[0]);
+    const name = parts[1];
+    if (!isNaN(seatNum) && name) {
+      students.push({ seat_num: seatNum, name });
+    } else {
+      parseErrors.push(`第 ${i + 1} 行格式錯誤: ${line}`);
+    }
+  }
+
+  if (students.length === 0) {
+    return alert('沒有可匯入的有效資料，格式應為：座號,姓名');
+  }
+
+  if (!confirm(`將匯入 ${students.length} 位學生${parseErrors.length ? `（${parseErrors.length} 行格式錯誤將略過）` : ''}，確定嗎？`)) return;
+
+  try {
+    const result = await fetchAPI(`/api/classes/${currentClassId}/students/batch`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ students })
+    });
+
+    let msg = `✅ 成功匯入 ${result.imported} 位學生`;
+    if (result.errors && result.errors.length > 0) {
+      msg += `<br>⚠️ 以下座號已存在，略過：${result.errors.join('、')}`;
+    }
+    if (parseErrors.length > 0) {
+      msg += `<br>⚠️ 格式錯誤略過：${parseErrors.join('；')}`;
+    }
+
+    const resultDiv = document.getElementById('batch-result');
+    resultDiv.innerHTML = msg;
+    resultDiv.className = 'mt-3 text-sm p-3 rounded-xl ' + (result.errors.length > 0 || parseErrors.length > 0 ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700');
+    resultDiv.classList.remove('hidden');
+
+    await loadStudents();
+    renderRosterList();
+  } catch (err) {
+    alert('匯入失敗：' + err.message);
+  }
+}
+
 // --- Auth ---
 async function checkAuth() {
   try {

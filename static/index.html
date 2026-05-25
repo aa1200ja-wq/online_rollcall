@@ -246,6 +246,10 @@
             <h3 class="font-bold text-slate-700 text-sm mb-3 flex items-center space-x-2">
               <i class="fa-solid fa-user-plus text-blue-500"></i>
               <span>新增學生</span>
+              <button type="button" onclick="openBatchImport()" class="ml-auto text-xs text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-lg transition flex items-center space-x-1">
+                <i class="fa-solid fa-upload"></i>
+                <span>批量匯入</span>
+              </button>
             </h3>
             <form id="add-student-form" onsubmit="saveStudent(event)" class="space-y-4">
               <input type="hidden" id="edit-student-id" value="">
@@ -288,6 +292,29 @@
                 </tbody>
               </table>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Batch Import Modal -->
+      <div id="batch-modal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center hidden transition-all">
+        <div class="bg-white rounded-2xl shadow-xl border border-slate-150 w-full max-w-xl mx-4 p-6">
+          <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-bold text-slate-800 flex items-center space-x-2">
+              <i class="fa-solid fa-upload text-blue-500"></i>
+              <span>批量匯入學生</span>
+            </h3>
+            <button onclick="closeBatchImport()" class="text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>
+          </div>
+          <p class="text-sm text-slate-500 mb-3">請按格式輸入，一行一筆：<span class="font-mono text-xs bg-slate-100 px-2 py-0.5 rounded">座號,姓名</span></p>
+          <textarea id="batch-textarea" rows="12" class="w-full border border-slate-200 rounded-xl p-3 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y" placeholder="1,王小明&#10;2,李小華&#10;3,張大為&#10;4,陳美玲"></textarea>
+          <div id="batch-result" class="hidden mt-3 text-sm"></div>
+          <div class="flex justify-end space-x-3 mt-4">
+            <button onclick="closeBatchImport()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl text-sm transition">取消</button>
+            <button onclick="submitBatchImport()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl text-sm shadow-sm shadow-blue-100 transition flex items-center space-x-2">
+              <i class="fa-solid fa-check"></i>
+              <span>確認匯入</span>
+            </button>
           </div>
         </div>
       </div>
