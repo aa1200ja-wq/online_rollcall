@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>雲端點名管理系統</title>
+<!-- Tailwind CSS via CDN -->
+<script src="https://cdn.tailwindcss.com"></script>
+<!-- Font Awesome Icons -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+  /* Custom scrollbar styling */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: #f1f1f1; }
+  ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+  
+  /* Prevent sticky column jitter */
+  .table-container { overflow: auto; max-height: calc(100vh - 280px); }
+  .sticky-col { position: sticky; left: 0; background: white; z-index: 10; }
+  .sticky-col-header { position: sticky; left: 0; z-index: 20; background: #1e3a8a !important; }
+  
+  .day-cell { min-width: 32px; width: 32px; }
+  
+  /* Print styling */
+  @media print {
+    .no-print { display: none !important; }
+    .print-full { width: 100% !important; max-width: 100% !important; box-shadow: none !important; margin: 0 !important; padding: 0 !important; }
+    table { font-size: 10px !important; }
+  }
+</style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col">
+
+  <!-- Header -->
+  <header class="bg-blue-900 text-white shadow-md no-print">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center space-x-3">
+        <i class="fa-solid fa-clipboard-user text-2xl text-yellow-400"></i>
+        <h1 class="text-xl font-bold tracking-wide">雲端智慧點名系統</h1>
+      </div>
+      <div class="flex items-center space-x-4">
+        <div id="sync-status" class="text-xs bg-blue-800 text-blue-200 px-3 py-1.5 rounded-full flex items-center space-x-2 transition-all">
+          <i class="fa-solid fa-cloud-check text-green-400"></i>
+          <span>雲端已同步</span>
+        </div>
+        <div class="text-sm border-l border-blue-700 pl-4 text-blue-100 flex items-center space-x-2">
+          <i class="fa-regular fa-calendar"></i>
+          <span id="current-year-txt">2026 學年度</span>
+        </div>
+        <div class="flex items-center space-x-3 border-l border-blue-700 pl-4">
+          <span class="flex items-center space-x-1.5 text-xs text-blue-200">
+            <i class="fa-solid fa-user-check text-blue-300"></i>
+            <span id="teacher-name-display">老師</span>
+          </span>
+          <button onclick="handleLogout()" class="text-xs text-blue-300 hover:text-white transition flex items-center space-x-1" title="登出">
+            <i class="fa-solid fa-right-from-bracket"></i>
+            <span>登出</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content Layout -->
+  <div class="flex-1 flex max-w-7xl w-full mx-auto p-4 gap-4">
+    
+    <!-- Sidebar - Class and View navigation (No Print) -->
+    <aside class="w-64 bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col gap-4 no-print shrink-0">
+      
+      <!-- Class Selector Section -->
+      <div>
+        <div class="flex justify-between items-center mb-2.5">
+          <h2 class="text-xs font-bold text-slate-400 tracking-wider uppercase">班級清單</h2>
+          <button onclick="promptCreateClass()" class="text-blue-600 hover:text-blue-800 text-xs font-semibold flex items-center space-x-1 transition">
+            <i class="fa-solid fa-plus-circle"></i>
+            <span>新增</span>
+          </button>
+        </div>
+        <div id="class-list" class="space-y-1 max-h-48 overflow-y-auto pr-1">
+          <!-- Dynamically loaded classes -->
+        </div>
+      </div>
+      
+      <hr class="border-slate-100">
+      
+      <!-- Navigation Tabs Section -->
+      <nav class="space-y-1">
+        <h2 class="text-xs font-bold text-slate-400 tracking-wider uppercase mb-2">視圖切換</h2>
+        <button id="tab-rollcall-btn" onclick="setActiveTab('rollcall')" class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition active bg-blue-50 text-blue-700">
+          <i class="fa-solid fa-calendar-days text-base"></i>
+          <span>每日點名看板</span>
+        </button>
+        <button id="tab-students-btn" onclick="setActiveTab('students')" class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50 transition">
+          <i class="fa-solid fa-users-gear text-base"></i>
+          <span>班級學生管理</span>
+        </button>
+        <button id="tab-summary-btn" onclick="setActiveTab('summary')" class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50 transition">
+          <i class="fa-solid fa-chart-line text-base"></i>
+          <span>全學年統計表</span>
+        </button>
+      </nav>
+      
+      <!-- Footer Info in Sidebar -->
+      <div class="mt-auto pt-4 border-t border-slate-100 text-xs text-slate-400 text-center">
+        <span>系統版本 v2.0 (全端雲端版)</span>
+      </div>
+    </aside>
+
+    <!-- Main Container Area -->
+    <main class="flex-1 min-w-0 flex flex-col gap-4 print-full">
+      
+      <!-- Toolbar Section (Only for active view, hidden in Print) -->
+      <section id="main-toolbar" class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-wrap gap-4 items-center justify-between no-print">
+        
+        <!-- Interactive Mode Selection -->
+        <div class="flex items-center space-x-2">
+          <span class="text-xs font-bold text-slate-400 uppercase tracking-wider mr-2">標記工具:</span>
+          <button onclick="setMarkMode('present')" id="mode-present" class="mode-btn px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-100 text-emerald-800 border-2 border-emerald-300 shadow-sm flex items-center space-x-1 transition active">
+            <span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+            <span>出席 (✓)</span>
+          </button>
+          <button onclick="setMarkMode('personal')" id="mode-personal" class="mode-btn px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-100 text-amber-800 border border-transparent flex items-center space-x-1 hover:bg-amber-200 transition">
+            <span class="inline-block w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+            <span>事假 (事)</span>
+          </button>
+          <button onclick="setMarkMode('sick')" id="mode-sick" class="mode-btn px-3 py-1.5 rounded-lg text-xs font-medium bg-purple-100 text-purple-800 border border-transparent flex items-center space-x-1 hover:bg-purple-200 transition">
+            <span class="inline-block w-2.5 h-2.5 rounded-full bg-purple-500"></span>
+            <span>病假 (病)</span>
+          </button>
+          <button onclick="setMarkMode('absent')" id="mode-absent" class="mode-btn px-3 py-1.5 rounded-lg text-xs font-medium bg-rose-100 text-rose-800 border border-transparent flex items-center space-x-1 hover:bg-rose-200 transition">
+            <span class="inline-block w-2.5 h-2.5 rounded-full bg-rose-500"></span>
+            <span>缺課 (✕)</span>
+          </button>
+        </div>
+
+        <!-- Utility Buttons -->
+        <div class="flex items-center space-x-2">
+          <button onclick="markAllStudentsPresent()" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition">
+            <i class="fa-solid fa-check-double text-slate-500"></i>
+            <span>全員出席</span>
+          </button>
+          <button onclick="resetCurrentMonth()" class="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition">
+            <i class="fa-solid fa-trash-can"></i>
+            <span>重置點名</span>
+          </button>
+          <button onclick="window.print()" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition shadow-sm shadow-blue-100">
+            <i class="fa-solid fa-print"></i>
+            <span>列印報表</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- Month Tabs and Class Information Panel -->
+      <section id="month-tabs-panel" class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col gap-4 no-print">
+        <div class="flex justify-between items-center flex-wrap gap-2">
+          <div class="flex items-center space-x-2">
+            <span class="text-lg font-bold text-slate-800" id="current-class-title">載入中...</span>
+            <span id="class-edit-btn" onclick="promptRenameClass()" class="text-xs text-slate-400 hover:text-blue-600 cursor-pointer transition p-1" title="修改班級名稱">
+              <i class="fa-solid fa-pen"></i>
+            </span>
+          </div>
+          <!-- Year Selector -->
+          <div class="flex items-center space-x-2 text-sm bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg">
+            <span class="text-slate-500 font-medium">年度:</span>
+            <select id="year-select" onchange="onYearChange()" class="bg-transparent font-bold text-slate-700 focus:outline-none cursor-pointer">
+              <option value="2026" selected>2026年 (民國115年)</option>
+              <option value="2027">2027年 (民國116年)</option>
+            </select>
+          </div>
+        </div>
+        <div class="flex flex-wrap gap-1.5 border-b border-slate-100 pb-1" id="month-tabs-row">
+          <!-- 12 Month Buttons dynamically rendered -->
+        </div>
+      </section>
+
+      <!-- VIEW 1: ROLLCALL VIEW -->
+      <div id="view-rollcall" class="view-content flex flex-col gap-4">
+        
+        <!-- Legend bar -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 py-3 flex flex-wrap gap-4 items-center text-xs text-slate-500 no-print">
+          <span class="font-bold text-slate-400 uppercase tracking-wider">圖例:</span>
+          <span class="flex items-center space-x-1"><span class="w-3.5 h-3.5 rounded bg-emerald-100 border border-emerald-200"></span> <span>出席 (✓)</span></span>
+          <span class="flex items-center space-x-1"><span class="w-3.5 h-3.5 rounded bg-amber-100 border border-amber-200"></span> <span>事假 (事)</span></span>
+          <span class="flex items-center space-x-1"><span class="w-3.5 h-3.5 rounded bg-purple-100 border border-purple-200"></span> <span>病假 (病)</span></span>
+          <span class="flex items-center space-x-1"><span class="w-3.5 h-3.5 rounded bg-rose-100 border border-rose-200"></span> <span>國定假日</span></span>
+          <span class="flex items-center space-x-1"><span class="w-3.5 h-3.5 rounded bg-slate-100 border border-slate-200"></span> <span>週末</span></span>
+        </div>
+
+        <!-- Interactive Grid table -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col gap-4 print-full">
+          <div class="table-container shadow-inner border border-slate-150 rounded-lg overflow-x-auto">
+            <table class="w-full text-center text-xs" id="rollcall-grid-table">
+              <!-- Dynamically constructed headers and student records -->
+            </table>
+          </div>
+          
+          <!-- Month Stats Footer Table inside Month Tab -->
+          <div class="stats-section print:break-inside-avoid">
+            <div class="border-b border-slate-100 pb-2 mb-3">
+              <h3 class="text-sm font-bold text-slate-700 flex items-center space-x-2">
+                <i class="fa-solid fa-calculator text-yellow-500"></i>
+                <span id="monthly-stats-heading">▼ 月份缺課統計</span>
+              </h3>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="min-w-full text-slate-600">
+                <thead>
+                  <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold">
+                    <th class="py-2.5 px-3 text-center w-16">座號</th>
+                    <th class="py-2.5 px-3 text-left w-24">姓名</th>
+                    <th class="py-2.5 px-3 text-center">出席</th>
+                    <th class="py-2.5 px-3 text-center">事假</th>
+                    <th class="py-2.5 px-3 text-center">病假</th>
+                    <th class="py-2.5 px-3 text-center">曠課</th>
+                    <th class="py-2.5 px-3 text-center w-32">缺課率</th>
+                  </tr>
+                </thead>
+                <tbody id="monthly-stats-tbody">
+                  <!-- Stats Rows rendered dynamically -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- VIEW 2: STUDENTS MANAGEMENT -->
+      <div id="view-students" class="view-content hidden bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex flex-col gap-6 print-full">
+        <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+          <div>
+            <h2 class="text-lg font-bold text-slate-800">班級學生名單管理</h2>
+            <p class="text-slate-400 text-xs">在此管理班級的學生名單，可自由編輯、新增或刪除座號與姓名。</p>
+          </div>
+          <!-- Delete class button -->
+          <button onclick="deleteCurrentClass()" class="no-print text-rose-500 hover:text-rose-700 text-xs font-semibold flex items-center space-x-1 px-3 py-1.5 hover:bg-rose-50 rounded-lg transition border border-rose-200">
+            <i class="fa-solid fa-trash-can"></i>
+            <span>刪除此班級</span>
+          </button>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+          
+          <!-- Add Student Form Card (Left side) -->
+          <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 h-fit no-print">
+            <h3 class="font-bold text-slate-700 text-sm mb-3 flex items-center space-x-2">
+              <i class="fa-solid fa-user-plus text-blue-500"></i>
+              <span>新增學生</span>
+            </h3>
+            <form id="add-student-form" onsubmit="saveStudent(event)" class="space-y-4">
+              <input type="hidden" id="edit-student-id" value="">
+              <div>
+                <label class="block text-xs font-semibold text-slate-500 mb-1">座號</label>
+                <input type="number" min="1" id="student-seat-input" required class="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-500 mb-1">姓名</label>
+                <input type="text" id="student-name-input" required class="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="例如：王小明">
+              </div>
+              <div class="flex space-x-2">
+                <button type="submit" id="add-student-btn" class="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg text-xs shadow-sm transition">
+                  確認新增
+                </button>
+                <button type="button" id="cancel-edit-btn" onclick="clearStudentForm()" class="hidden px-3 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold rounded-lg text-xs transition">
+                  取消
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Roster List Table (Right side, spans 2 columns) -->
+          <div class="md:col-span-2 flex flex-col border border-slate-150 rounded-xl overflow-hidden bg-white">
+            <div class="bg-slate-50 border-b border-slate-150 p-3 flex justify-between items-center">
+              <span class="font-bold text-slate-700 text-sm">現有學生名單</span>
+              <span class="text-xs bg-blue-100 text-blue-800 font-semibold px-2.5 py-0.5 rounded-full" id="roster-count-txt">20 人</span>
+            </div>
+            <div class="max-h-96 overflow-y-auto">
+              <table class="w-full text-left text-xs text-slate-600">
+                <thead>
+                  <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold">
+                    <th class="py-2.5 px-4 text-center w-16">座號</th>
+                    <th class="py-2.5 px-4 text-left">姓名</th>
+                    <th class="py-2.5 px-4 text-right w-28 no-print">操作</th>
+                  </tr>
+                </thead>
+                <tbody id="student-roster-tbody">
+                  <!-- Dynamically rendered roster rows -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- VIEW 3: ANNUAL SUMMARY STATISTICS -->
+      <div id="view-summary" class="view-content hidden bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex flex-col gap-4 print-full">
+        <div>
+          <h2 class="text-lg font-bold text-slate-800">全學年缺課統計表</h2>
+          <p class="text-slate-400 text-xs">彙整每位學生的每月缺課率與全學年平均缺課率統計資料。</p>
+        </div>
+        
+        <div class="summary-wrap border border-slate-150 rounded-xl overflow-x-auto shadow-inner">
+          <table class="w-full text-center text-xs" id="annual-summary-table">
+            <!-- Dynamically generated rows -->
+          </table>
+        </div>
+
+        <div class="stats-section bg-slate-50 border border-slate-200 p-3 rounded-lg py-2">
+          <div class="flex flex-wrap gap-4 text-xs text-slate-500">
+            <span class="font-bold text-slate-400">指標標準:</span>
+            <span class="flex items-center space-x-1.5"><span class="w-3 h-3 rounded bg-green-500"></span> <span>全勤 (0% 缺課率)</span></span>
+            <span class="flex items-center space-x-1.5"><span class="w-3 h-3 rounded bg-amber-500"></span> <span>缺課率 ≤ 20%</span></span>
+            <span class="flex items-center space-x-1.5"><span class="w-3 h-3 rounded bg-rose-500"></span> <span>缺課率 > 20% (異常)</span></span>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- Loading Backdrop -->
+  <div id="loading-backdrop" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center transition-all hidden">
+    <div class="bg-white p-6 rounded-2xl shadow-xl border border-slate-150 flex flex-col items-center space-y-4">
+      <div class="relative w-12 h-12">
+        <div class="absolute inset-0 rounded-full border-4 border-slate-200"></div>
+        <div class="absolute inset-0 rounded-full border-4 border-blue-600 border-t-transparent animate-spin"></div>
+      </div>
+      <span class="text-slate-700 font-semibold text-sm">雲端通訊中...</span>
+    </div>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

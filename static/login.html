@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>老師登入 - 雲端點名系統</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+body { background: linear-gradient(135deg, #1e3a5f 0%, #1e40af 50%, #1e3a5f 100%); background-attachment: fixed; }
+.card-shine { position: relative; overflow: hidden; }
+.card-shine::before {
+  content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%;
+  background: radial-gradient(circle, rgba(255,255,255,0.05) 0%, transparent 60%);
+  pointer-events: none;
+}
+</style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+  <div class="w-full max-w-md">
+    <!-- Header -->
+    <div class="text-center mb-8">
+      <div class="inline-flex items-center justify-center w-16 h-16 bg-white/10 backdrop-blur rounded-2xl mb-4">
+        <i class="fa-solid fa-clipboard-user text-3xl text-yellow-400"></i>
+      </div>
+      <h1 class="text-2xl font-bold text-white">雲端智慧點名系統</h1>
+      <p class="text-blue-200 text-sm mt-1">教師專用入口</p>
+    </div>
+
+    <!-- Login Card -->
+    <div class="card-shine bg-white/95 backdrop-blur rounded-2xl shadow-2xl p-8 border border-white/20">
+      <h2 class="text-xl font-bold text-slate-800 mb-6 flex items-center space-x-3">
+        <i class="fa-solid fa-lock text-blue-600"></i>
+        <span>老師登入</span>
+      </h2>
+
+      <form id="login-form" class="space-y-5" onsubmit="handleLogin(event)">
+        <div>
+          <label class="block text-sm font-semibold text-slate-600 mb-1.5">
+            <i class="fa-solid fa-user mr-1 text-slate-400"></i> 帳號
+          </label>
+          <input type="text" id="username" name="username" required autocomplete="username" autofocus
+            class="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+            placeholder="請輸入教師帳號">
+        </div>
+
+        <div>
+          <label class="block text-sm font-semibold text-slate-600 mb-1.5">
+            <i class="fa-solid fa-lock mr-1 text-slate-400"></i> 密碼
+          </label>
+          <input type="password" id="password" name="password" required autocomplete="current-password"
+            class="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+            placeholder="請輸入密碼">
+        </div>
+
+        <div id="login-error" class="hidden bg-rose-50 border border-rose-200 text-rose-600 text-sm px-4 py-3 rounded-xl flex items-center space-x-2">
+          <i class="fa-solid fa-circle-exclamation"></i>
+          <span id="login-error-msg">帳號或密碼錯誤</span>
+        </div>
+
+        <button type="submit" id="login-btn"
+          class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-sm shadow-lg shadow-blue-200 transition flex items-center justify-center space-x-2">
+          <i class="fa-solid fa-right-to-bracket"></i>
+          <span>登入系統</span>
+        </button>
+      </form>
+
+      <div class="mt-6 pt-5 border-t border-slate-100 text-xs text-slate-400 text-center space-y-1">
+        <p>預設帳號：<span class="font-mono text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded">teacher</span>　密碼：<span class="font-mono text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded">teacher123</span></p>
+        <p class="pt-1">首次使用請以此帳號登入，後續可於系統中修改密碼。</p>
+      </div>
+    </div>
+
+    <p class="text-center text-blue-300 text-xs mt-6">
+      <i class="fa-regular fa-copyright mr-1"></i> 2026 雲端智慧點名系統 v2.0
+    </p>
+  </div>
+
+<script>
+async function handleLogin(event) {
+  event.preventDefault();
+  const btn = document.getElementById('login-btn');
+  const errDiv = document.getElementById('login-error');
+  const errMsg = document.getElementById('login-error-msg');
+
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fa-solid fa-spinner animate-spin"></i><span>登入中...</span>';
+
+  try {
+    const res = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username: document.getElementById('username').value.trim(),
+        password: document.getElementById('password').value
+      })
+    });
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || '登入失敗');
+    }
+
+    window.location.href = '/';
+  } catch (err) {
+    errDiv.classList.remove('hidden');
+    errMsg.textContent = err.message;
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i><span>登入系統</span>';
+  }
+}
+
+document.getElementById('login-form').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') handleLogin(e);
+});
+</script>
+</body>
+</html>
